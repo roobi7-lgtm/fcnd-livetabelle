@@ -80,14 +80,30 @@ let session = null;
 let refreshTimer = null;
 
 async function api(path, options={}){
-  const headers={apikey:SUPABASE_KEY,"Content-Type":"application/json",...(options.headers||{})};
-  headers.Authorization = session?.access_token ? `Bearer ${session.access_token}` : `Bearer ${SUPABASE_KEY}`;
-  const res=await fetch(`${SUPABASE_URL}${path}`,{...options,headers});
-  if(!res.ok){let txt=await res.text();throw new Error(txt||`HTTP ${res.status}`)}
-  return res.status===204?null:res.json();
+  const headers={
+    apikey:SUPABASE_KEY,
+    "Content-Type":"application/json",
+    ...(options.headers||{})
+  };
+  headers.Authorization=session?.access_token
+    ? `Bearer ${session.access_token}`
+    : `Bearer ${SUPABASE_KEY}`;
+
+  const res=await fetch(`${SUPABASE_URL}${path}`,{
+    ...options,
+    headers
+  });
+
+  if(!res.ok){
+    const txt=await res.text();
+    throw new Error(txt||`HTTP ${res.status}`);
+  }
+
+  return res.status===204?null:await res.json();
 }
-async function loadResults(){
-  try{
+  
+  
+  try
     const rows=await api(`/rest/v1/${RESULTS_TABLE}?select=match_key,home,away,hg,ag`);
     const remote={};
     (rows||[]).forEach(r=>remote[r.match_key]={home:r.home,away:r.away,hg:r.hg??"",ag:r.ag??""});
