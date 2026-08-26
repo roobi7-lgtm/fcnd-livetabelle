@@ -1,0 +1,36 @@
+<!doctype html><html lang="de"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b1020"><title>FCND-Kickbase</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0b1020;color:#f4f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+header{padding:22px 16px;border-bottom:1px solid #293754;position:sticky;top:0;background:#0b1020ee;backdrop-filter:blur(10px);z-index:5}h1{margin:0;font-size:27px}header p{margin:5px 0 0;color:#aeb8ca}
+main{max-width:1050px;margin:auto;padding:14px}nav{display:flex;gap:8px;overflow:auto;margin-bottom:14px}button,select,input{font:inherit}button,select,input{border:1px solid #30405f;border-radius:11px;padding:11px;background:#121b2e;color:#fff}button{font-weight:700;cursor:pointer}.active{background:#22c55e!important;color:#06120a!important;border-color:#22c55e!important}
+.card{background:#151e32;border:1px solid #293754;border-radius:18px;padding:15px;margin-bottom:14px}.muted{color:#aeb8ca}.scroll{overflow:auto}
+table{width:100%;min-width:680px;border-collapse:collapse}th,td{padding:10px 8px;border-bottom:1px solid #293754;text-align:center}th:nth-child(1),td:nth-child(1),th:nth-child(2),td:nth-child(2){text-align:left}th{color:#aeb8ca;font-size:13px}tr.highlight{background:#163622}
+.day{margin-bottom:14px}.match{display:grid;grid-template-columns:1fr 92px 1fr;align-items:center;gap:8px;padding:10px 0;border-top:1px solid #293754}.away{text-align:right}.score{display:flex;justify-content:center;align-items:center;gap:5px}.score input{width:42px;text-align:center;padding:8px}
+.teamgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.teamgrid label{display:block}.teamgrid span{display:block;color:#aeb8ca;font-size:12px;margin-bottom:4px}.hidden{display:none}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+@media(max-width:600px){.teamgrid{grid-template-columns:1fr}.match{grid-template-columns:1fr 86px 1fr;font-size:14px}}
+</style></head><body>
+<header><h1>⚽ FCND-Kickbase</h1><p>10 Mannschaften · 34 Spieltage · H2H</p></header>
+<main><nav><button class="active" onclick="tab('table',this)">📊 Tabelle</button><button onclick="tab('schedule',this)">🗓️ Spielplan</button><button onclick="tab('teams',this)">👥 Mannschaften</button></nav>
+<section id="table"><div class="card"><h2>Live-Tabelle</h2><p class="muted">Punkte → Tordifferenz → erzielte Tore.</p></div><div class="card scroll"><table><thead><tr><th>#</th><th>Mannschaft</th><th>Sp</th><th>S</th><th>U</th><th>N</th><th>Tore</th><th>TD</th><th>Pkt</th></tr></thead><tbody id="tbody"></tbody></table></div><div class="card"><button onclick="resetResults()">♻️ Alle Ergebnisse löschen</button></div></section>
+<section id="schedule" class="hidden"><div class="card"><h2>34 Spieltage</h2><p class="muted">5 H2H-Partien pro Spieltag.</p></div><div id="days"></div></section>
+<section id="teams" class="hidden"><div class="card"><h2>Mannschaften</h2><p class="muted">Die 10 Startnamen sind bereits hinterlegt.</p><div id="teamInputs" class="teamgrid"></div><div class="actions"><button onclick="saveTeams()">💾 Namen speichern</button></div></div></section>
+</main>
+<script>
+const DEFAULT_TEAMS=['El Theodoro', 'Roobi43', 'Timo', 'Marino', 'Silvan', 'Fasanese', 'Tschuls', 'NicoBritt', 'Gianluca', 'Fabrice'];
+let teams=JSON.parse(localStorage.getItem("fcndTeams")||"null")||DEFAULT_TEAMS.slice();
+let results=JSON.parse(localStorage.getItem("fcndResults")||"{}");
+function tab(id,btn){document.querySelectorAll("main section").forEach(x=>x.classList.add("hidden"));document.getElementById(id).classList.remove("hidden");document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));btn.classList.add("active");if(id==="table")renderTable();if(id==="schedule")renderSchedule();if(id==="teams")renderTeams();}
+function makeCycle(){let a=[0,1,2,3,4,5,6,7,8,9],out=[];for(let r=0;r<9;r++){let games=[];for(let i=0;i<5;i++){let h=a[i],v=a[9-i];if(r%2)[h,v]=[v,h];games.push([h,v]);}out.push(games);a=[a[0],a[9],...a.slice(1,9)];}return out;}
+function buildSchedule(){const c=makeCycle(),all=[];for(let block=0;block<4;block++)for(let r=0;r<9;r++)if(all.length<34)all.push(c[r].map(([h,a])=>block%2?[a,h]:[h,a]));return all;}
+let rounds=buildSchedule();
+function renderTable(){let s=teams.map((name,i)=>({name,sp:0,w:0,d:0,l:0,gf:0,ga:0,p:0}));rounds.forEach((games,r)=>games.forEach((g,j)=>{let v=results[r+"-"+j];if(!v||v.h===""||v.a==="")return;let h=+v.h,a=+v.a,H=s[g[0]],A=s[g[1]];H.sp++;A.sp++;H.gf+=h;H.ga+=a;A.gf+=a;A.ga+=h;if(h>a){H.w++;A.l++;H.p+=3}else if(h<a){A.w++;H.l++;A.p+=3}else{H.d++;A.d++;H.p++;A.p++;}}));s.forEach(x=>x.td=x.gf-x.ga);s.sort((a,b)=>b.p-a.p||b.td-a.td||b.gf-a.gf||a.name.localeCompare(b.name));tbody.innerHTML=s.map((x,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+esc(x.name)+'</b></td><td>'+x.sp+'</td><td>'+x.w+'</td><td>'+x.d+'</td><td>'+x.l+'</td><td>'+x.gf+':'+x.ga+'</td><td>'+(x.td>0?"+":"")+x.td+'</td><td><b>'+x.p+'</b></td></tr>').join("");}
+function renderSchedule(){days.innerHTML=rounds.map((games,r)=>'<div class="card day"><h2>Spieltag '+(r+1)+'</h2>'+games.map((g,j)=>{let k=r+"-"+j,v=results[k]||{h:"",a:""};return '<div class="match"><div>'+esc(teams[g[0]])+'</div><div class="score"><input type="number" min="0" value="'+v.h+'" onchange="score(\''+k+'\',this.value,\'h\')"><b>:</b><input type="number" min="0" value="'+v.a+'" onchange="score(\''+k+'\',this.value,\'a\')"></div><div class="away">'+esc(teams[g[1]])+'</div></div>';}).join("")+'</div>').join("");}
+function score(k,v,side){results[k]=results[k]||{h:"",a:""};results[k][side]=v;localStorage.setItem("fcndResults",JSON.stringify(results));renderTable();}
+function renderTeams(){teamInputs.innerHTML=teams.map((x,i)=>'<label><span>Mannschaft '+(i+1)+'</span><input id="t'+i+'" value="'+esc(x)+'"></label>').join("");}
+function saveTeams(){teams=teams.map((_,i)=>document.getElementById("t"+i).value.trim()||"Team "+(i+1));localStorage.setItem("fcndTeams",JSON.stringify(teams));rounds=buildSchedule();renderTable();renderSchedule();renderTeams();alert("Mannschaftsnamen gespeichert.");}
+function resetResults(){if(confirm("Wirklich alle Ergebnisse löschen?")){results={};localStorage.removeItem("fcndResults");renderTable();renderSchedule();}}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
+renderTable();
+</script></body></html>
