@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>FCND Live-Tabelle</title>
+<style>
+:root{--bg:#0b1020;--card:#151c2f;--card2:#0f1728;--line:#2b3858;--text:#f4f7fb;--muted:#aeb8ca;--accent:#39d353;--danger:#ff6262}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#080d18,#11182b);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+header{padding:24px 16px 14px;position:sticky;top:0;background:rgba(8,13,24,.96);backdrop-filter:blur(10px);z-index:5;border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:28px}.sub{margin-top:6px;color:var(--muted);font-size:16px;font-weight:600}
+main{max-width:1050px;margin:auto;padding:16px}.tabs{display:flex;gap:10px;overflow:auto;margin-bottom:16px}.tabs button,.btn{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:18px;padding:14px 20px;font-size:17px;font-weight:700;white-space:nowrap}.tabs button.active{background:var(--accent);color:#06100a;border-color:var(--accent)}
+.card{background:rgba(21,28,47,.96);border:1px solid var(--line);border-radius:22px;padding:18px;margin-bottom:16px;box-shadow:0 10px 30px rgba(0,0,0,.16)}
+h2{margin:0 0 5px;font-size:23px}.muted{color:var(--muted)}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+select,input{background:#0c1324;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:16px}.btn{cursor:pointer}.btn.primary{background:var(--accent);color:#06100a;border-color:var(--accent)}.btn.danger{color:#fff;background:#63252b;border-color:#8e3a42}
+.tablewrap{overflow:auto}.table{width:100%;border-collapse:collapse;min-width:690px}.table th,.table td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:center}.table th:nth-child(2),.table td:nth-child(2){text-align:left}.table th{color:var(--muted)}.table tr.fcnd{background:rgba(57,211,83,.12)}.rank{font-weight:800}
+.match{display:grid;grid-template-columns:1fr 90px 1fr;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}.match:last-child{border-bottom:0}.team{font-weight:700}.away{text-align:right}.score{display:flex;gap:6px;justify-content:center}.score input{width:42px;text-align:center;padding:9px}.daytitle{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
+.hidden{display:none!important}.notice{padding:12px 14px;border-radius:14px;background:#101a2e;color:var(--muted);margin-top:10px}
+@media(max-width:600px){main{padding:12px}header{padding:18px 14px 12px}h1{font-size:25px}.card{padding:15px}.match{grid-template-columns:1fr 82px 1fr}.team{font-size:14px}.table th,.table td{padding:10px 8px}}
+</style>
+</head>
+<body>
+<header><h1>⚽ FCND Live-Tabelle</h1><div class="sub">10 Mannschaften · 34 Spieltage · H2H</div></header>
+<main>
+<div class="tabs">
+<button class="active" data-tab="table">📊 Tabelle</button>
+<button data-tab="days">🏟️ Spieltage</button>
+<button data-tab="teams">👥 Mannschaften</button>
+</div>
+
+<section id="table" class="tab">
+<div class="card"><h2>Aktuelle Tabelle</h2><div class="muted">Sortierung: Punkte → Tordifferenz → Tore → H2H</div><div class="row" style="margin-top:14px"><button class="btn danger" id="reset">Ergebnisse zurücksetzen</button></div></div>
+<div class="card tablewrap"><table class="table"><thead><tr><th>#</th><th>Mannschaft</th><th>Sp</th><th>S</th><th>U</th><th>N</th><th>Tore</th><th>TD</th><th>Pkt</th></tr></thead><tbody id="standings"></tbody></table></div>
+</section>
+
+<section id="days" class="tab hidden">
+<div class="card"><div class="daytitle"><h2>Spieltag</h2><select id="round"></select></div><div class="muted">Resultate eingeben und speichern. Die Tabelle wird automatisch aktualisiert.</div></div>
+<div class="card" id="matches"></div>
+</section>
+
+<section id="teams" class="tab hidden">
+<div class="card"><h2>Mannschaften</h2><div class="muted">Hier kannst du die 10 Namen jederzeit ändern.</div><div id="teamInputs" style="margin-top:14px"></div><button class="btn primary" id="saveTeams" style="margin-top:14px">Mannschaften speichern</button><div class="notice">Die Daten werden auf diesem Gerät im Browser gespeichert.</div></div>
+</section>
+</main>
+<script>
+const defaultTeams=["FCND","Team 2","Team 3","Team 4","Team 5","Team 6","Team 7","Team 8","Team 9","Team 10"];
+let teams=JSON.parse(localStorage.getItem("fcndTeams")||"null")||defaultTeams;
+let results=JSON.parse(localStorage.getItem("fcndResults")||"{}");
+
+function scheduleForRound(r){
+  // Circle method for 10 teams, then repeat the 17-round cycle with a shifted order.
+  const n=10, base=[...Array(n).keys()];
+  let arr=base.slice();
+  for(let i=0;i<r%9;i++) arr=[arr[0],arr[9],...arr.slice(1,9)]; // deterministic rotation
+  const games=[];
+  for(let i=0;i<5;i++){let a=arr[i],b=arr[n-1-i]; games.push([a,b]);}
+  return games;
+}
+function renderRoundSelect(){round.innerHTML="";for(let i=1;i<=34;i++){let o=document.createElement("option");o.value=i;o.textContent="Spieltag "+i;round.appendChild(o)}}
+function renderMatches(){
+ const r=+round.value; matches.innerHTML="";
+ scheduleForRound(r-1).forEach((g,idx)=>{
+  const key=`${r}-${idx}`, val=results[key]||["",""];
+  const d=document.createElement("div");d.className="match";
+  d.innerHTML=`<div class="team">${teams[g[0]]}</div><div class="score"><input inputmode="numeric" min="0" type="number" data-k="${key}" data-side="0" value="${val[0]}"><span>:</span><input inputmode="numeric" min="0" type="number" data-k="${key}" data-side="1" value="${val[1]}"></div><div class="team away">${teams[g[1]]}</div>`;
+  matches.appendChild(d);
+ });
+ matches.querySelectorAll("input").forEach(x=>x.addEventListener("change",()=>{let k=x.dataset.k;let side=+x.dataset.side;results[k]=results[k]||["",""];results[k][side]=x.value;localStorage.setItem("fcndResults",JSON.stringify(results));renderStandings();}));
+}
+function renderStandings(){
+ let s=teams.map((name,i)=>({i,name,sp:0,w:0,d:0,l:0,gf:0,ga:0,p:0}));
+ for(let r=1;r<=34;r++)scheduleForRound(r-1).forEach((g,idx)=>{
+  let v=results[`${r}-${idx}`];if(v?.[0]===""||v?.[1]===""||v==null)return;
+  let a=+v[0],b=+v[1],A=s[g[0]],B=s[g[1]];
+  A.sp++;B.sp++;A.gf+=a;A.ga+=b;B.gf+=b;B.ga+=a;
+  if(a>b){A.w++;B.l++;A.p+=3}else if(a<b){B.w++;A.l++;B.p+=3}else{A.d++;B.d++;A.p++;B.p++}
+ });
+ s.sort((a,b)=>b.p-a.p || (b.gf-b.ga)-(a.gf-a.ga) || b.gf-a.gf || a.name.localeCompare(b.name));
+ standings.innerHTML=s.map((x,i)=>`<tr class="${x.name===teams[0]?'fcnd':''}"><td class="rank">${i+1}</td><td><b>${x.name}</b></td><td>${x.sp}</td><td>${x.w}</td><td>${x.d}</td><td>${x.l}</td><td>${x.gf}:${x.ga}</td><td>${x.gf-x.ga}</td><td><b>${x.p}</b></td></tr>`).join("");
+}
+function renderTeams(){teamInputs.innerHTML=teams.map((t,i)=>`<div class="row" style="margin-bottom:9px"><b style="width:28px">${i+1}</b><input id="t${i}" value="${t}" style="flex:1"></div>`).join("")}
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tabs button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".tab").forEach(x=>x.classList.add("hidden"));document.getElementById(b.dataset.tab).classList.remove("hidden");if(b.dataset.tab==="days")renderMatches();if(b.dataset.tab==="teams")renderTeams()});
+round.onchange=renderMatches;
+reset.onclick=()=>{if(confirm("Wirklich alle Ergebnisse löschen?")){results={};localStorage.removeItem("fcndResults");renderMatches();renderStandings()}};
+saveTeams.onclick=()=>{teams=teams.map((_,i)=>document.getElementById("t"+i).value.trim()||`Team ${i+1}`);localStorage.setItem("fcndTeams",JSON.stringify(teams));renderTeams();renderMatches();renderStandings()};
+renderRoundSelect();round.value=1;renderStandings();
+</script>
+</body>
+</html>
